@@ -185,7 +185,8 @@ Sequencia atual de task: 165
 | TASK-169 | Criar README detalhado do repositorio | DONE | 2026-04-10 | 2026-04-10 | Processo do projeto | [tasks/TASK-169-create-detailed-repository-readme.md](tasks/TASK-169-create-detailed-repository-readme.md) |
 | TASK-170 | Criar script de backup completo do Codex e workspaces | DONE | 2026-04-10 | 2026-04-10 | Processo do projeto | [tasks/TASK-170-create-full-codex-backup-script.md](tasks/TASK-170-create-full-codex-backup-script.md) |
 | TASK-171 | Criar script de restore do Codex e documento de backup/restore | DONE | 2026-04-10 | 2026-04-10 | Processo do projeto | [tasks/TASK-171-create-codex-restore-script-and-backup-doc.md](tasks/TASK-171-create-codex-restore-script-and-backup-doc.md) |
+| TASK-172 | Adicionar feedback de progresso ao script de backup do Codex | DONE | 2026-04-10 | 2026-04-10 | Processo do projeto | [tasks/TASK-172-add-progress-feedback-to-backup-script.md](tasks/TASK-172-add-progress-feedback-to-backup-script.md) |
 
 ## Proxima numeracao
 
-- Proxima task a ser aberta: `TASK-172`
+- Proxima task a ser aberta: `TASK-173`

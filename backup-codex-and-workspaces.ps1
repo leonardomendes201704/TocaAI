@@ -3,7 +3,8 @@ param(
   [string]$OutputDirectory = "$env:USERPROFILE\Desktop",
   [string]$CodexHome = "$env:USERPROFILE\.codex",
   [string]$WorkspacesRoot = "C:\Leonardo\Labs",
-  [switch]$AllowCodexRunning
+  [switch]$AllowCodexRunning,
+  [int]$ProgressUpdateSeconds = 5
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,6 +41,30 @@ function Format-Size {
   return '{0:N0} B' -f $Bytes
 }
 
+function Format-Duration {
+  param([TimeSpan]$Duration)
+
+  if ($Duration.TotalHours -ge 1) {
+    return '{0:00}:{1:00}:{2:00}' -f [math]::Floor($Duration.TotalHours), $Duration.Minutes, $Duration.Seconds
+  }
+
+  return '{0:00}:{1:00}' -f $Duration.Minutes, $Duration.Seconds
+}
+
+function Join-ProcessArguments {
+  param([string[]]$Arguments)
+
+  $quotedArguments = foreach ($argument in $Arguments) {
+    if ($argument -match '[\s"]') {
+      '"' + ($argument -replace '"', '\"') + '"'
+    } else {
+      $argument
+    }
+  }
+
+  return [string]::Join(' ', $quotedArguments)
+}
+
 if (-not (Test-Path -LiteralPath $CodexHome)) {
   throw "Nao encontrei a pasta do Codex em: $CodexHome"
 }
@@ -50,6 +75,10 @@ if (-not (Test-Path -LiteralPath $WorkspacesRoot)) {
 
 if (-not (Test-CommandExists -CommandName 'tar.exe')) {
   throw "Nao encontrei o tar.exe no PATH. Este script usa o tar nativo do Windows para gerar o ZIP."
+}
+
+if ($ProgressUpdateSeconds -lt 1) {
+  throw "ProgressUpdateSeconds deve ser maior ou igual a 1."
 }
 
 $codexProcesses = Get-Process -ErrorAction SilentlyContinue |
@@ -79,6 +108,7 @@ Write-Host "Total aprox. : $(Format-Size $totalSize)" -ForegroundColor Yellow
 Write-Host "Arquivo ZIP  : $zipPath" -ForegroundColor Green
 
 Write-Step "Gerando ZIP unico sem exclusoes"
+Write-Host "Feedback durante a compressao: tempo decorrido e tamanho atual do ZIP." -ForegroundColor DarkGray
 if (Test-Path -LiteralPath $zipPath) {
   Remove-Item -LiteralPath $zipPath -Force
 }
@@ -88,19 +118,74 @@ $codexLeaf = Split-Path -Path $CodexHome -Leaf
 $workspacesParent = Split-Path -Path $WorkspacesRoot -Parent
 $workspacesLeaf = Split-Path -Path $WorkspacesRoot -Leaf
 
-& tar.exe -a -c -f $zipPath `
-  -C $codexParent $codexLeaf `
-  -C $workspacesParent $workspacesLeaf
+$tarArguments = @(
+  '-a'
+  '-c'
+  '-f'
+  $zipPath
+  '-C'
+  $codexParent
+  $codexLeaf
+  '-C'
+  $workspacesParent
+  $workspacesLeaf
+)
+
+$backupStartedAt = Get-Date
+$lastSizeDisplay = ""
+$lastHeartbeatAt = Get-Date '2000-01-01'
+
+$tarStartInfo = New-Object System.Diagnostics.ProcessStartInfo
+$tarStartInfo.FileName = 'tar.exe'
+$tarStartInfo.Arguments = Join-ProcessArguments -Arguments $tarArguments
+$tarStartInfo.UseShellExecute = $false
+$tarStartInfo.RedirectStandardOutput = $false
+$tarStartInfo.RedirectStandardError = $false
+$tarStartInfo.CreateNoWindow = $true
+
+$tarProcess = [System.Diagnostics.Process]::Start($tarStartInfo)
+
+while (-not $tarProcess.HasExited) {
+  $elapsed = (Get-Date) - $backupStartedAt
+  $zipSizeBytes = if (Test-Path -LiteralPath $zipPath) {
+    (Get-Item -LiteralPath $zipPath).Length
+  } else {
+    0
+  }
+  $zipSizeDisplay = Format-Size $zipSizeBytes
+  $statusLine = "Tempo decorrido: $(Format-Duration $elapsed) | ZIP atual: $zipSizeDisplay"
+
+  Write-Progress -Activity 'Gerando backup ZIP do Codex e workspaces' -Status $statusLine -CurrentOperation 'Compactando .codex e Labs'
+
+  if ($zipSizeDisplay -ne $lastSizeDisplay -or (((Get-Date) - $lastHeartbeatAt).TotalSeconds -ge $ProgressUpdateSeconds)) {
+    Write-Host "  $(Get-Date -Format 'HH:mm:ss') | $statusLine" -ForegroundColor DarkGray
+    $lastHeartbeatAt = Get-Date
+  }
+
+  $lastSizeDisplay = $zipSizeDisplay
+  Start-Sleep -Seconds $ProgressUpdateSeconds
+  $tarProcess.Refresh()
+}
+
+Write-Progress -Activity 'Gerando backup ZIP do Codex e workspaces' -Completed
+
+$tarProcess.WaitForExit()
+
+if ($tarProcess.ExitCode -ne 0) {
+  throw "O tar.exe terminou com erro. ExitCode=$($tarProcess.ExitCode)"
+}
 
 if (-not (Test-Path -LiteralPath $zipPath)) {
   throw "O ZIP nao foi gerado em: $zipPath"
 }
 
 $zipItem = Get-Item -LiteralPath $zipPath
+$totalElapsed = (Get-Date) - $backupStartedAt
 
 Write-Step "Backup concluido"
 Write-Host "ZIP criado com sucesso: $($zipItem.FullName)" -ForegroundColor Green
 Write-Host "Tamanho do ZIP       : $(Format-Size $zipItem.Length)" -ForegroundColor Green
+Write-Host "Tempo total          : $(Format-Duration $totalElapsed)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "Conteudo incluido no ZIP:" -ForegroundColor Cyan

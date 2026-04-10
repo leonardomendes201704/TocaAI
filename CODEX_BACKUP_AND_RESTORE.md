@@ -47,10 +47,24 @@ O script gera um ZIP unico por padrao na `Area de Trabalho`, com nome no formato
 C:\Users\devcr\Desktop\codex-full-backup_YYYY-MM-DD_HH-mm-ss.zip
 ```
 
+Durante a execucao, o script mostra:
+
+- tempo decorrido
+- tamanho atual do ZIP
+- resumo final com tamanho e tempo total
+
 ### Usar outra pasta de saida
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Leonardo\Labs\TocaAI\backup-codex-and-workspaces.ps1" -OutputDirectory "D:\Backups"
+```
+
+### Ajustar a frequencia do feedback
+
+Por padrao, o script atualiza o feedback a cada `5` segundos. Se quiser outro intervalo:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Leonardo\Labs\TocaAI\backup-codex-and-workspaces.ps1" -ProgressUpdateSeconds 2
 ```
 
 ### Ignorar a verificacao de processo aberto
